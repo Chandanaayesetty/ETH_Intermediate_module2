@@ -33,7 +33,7 @@ Before you begin, ensure you have met the following requirements:
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/ether-bank-of-india.git
+   git clone https://github.com/Chandanaayesetty/ETH_Intermediate_module2/tree/main
    cd ether-bank-of-india
    ```
 
