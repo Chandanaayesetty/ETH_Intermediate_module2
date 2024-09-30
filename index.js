@@ -9,6 +9,9 @@ export default function HomePage() {
   const [balance, setBalance] = useState(undefined);
   const [action, setAction] = useState(null);
   const [amount, setAmount] = useState(null);
+  const [recipient, setRecipient] = useState("");
+  const [rentAmount, setRentAmount] = useState(null);
+  const [exchangeAmount, setExchangeAmount] = useState(null);
   const [message, setMessage] = useState("");
   const [transactions, setTransactions] = useState([]);
   const [showTransactions, setShowTransactions] = useState(false);
@@ -45,7 +48,6 @@ export default function HomePage() {
     const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
     handleAccount(accounts);
 
-    // once wallet is set we can get a reference to our deployed contract
     getATMContract();
   };
 
@@ -80,18 +82,50 @@ export default function HomePage() {
     }
   };
 
+  const payToAddress = async () => {
+    if (atm && recipient && amount) {
+      const tx = await atm.pay(recipient, ethers.utils.parseEther(amount.toString()));
+      await tx.wait();
+      setTransactions([...transactions, { action: "paid", amount, recipient, timestamp: new Date().toLocaleString() }]);
+      getBalance();
+      setMessage(`Paid ${amount} ETH to ${recipient} successfully.`);
+      setRecipient("");
+      setAmount(null);
+    }
+  };
+
+  const exchangeCurrency = async () => {
+    if (atm && exchangeAmount) {
+      const tx = await atm.exchangeCurrency(exchangeAmount);
+      await tx.wait();
+      setTransactions([...transactions, { action: "exchanged", amount: exchangeAmount, timestamp: new Date().toLocaleString() }]);
+      getBalance();
+      setMessage(`Exchanged ${exchangeAmount} USD to tokens successfully.`);
+      setExchangeAmount(null);
+    }
+  };
+
+  const payRent = async () => {
+    if (atm && rentAmount) {
+      const tx = await atm.payRent(account, ethers.utils.parseEther(rentAmount.toString()));
+      await tx.wait();
+      setTransactions([...transactions, { action: "rent paid", amount: rentAmount, timestamp: new Date().toLocaleString() }]);
+      getBalance();
+      setMessage(`Paid ${rentAmount} ETH as rent successfully.`);
+      setRentAmount(null);
+    }
+  };
+
   const initUser = () => {
-    // Check to see if user has Metamask
     if (!ethWallet) {
       return <p>Please install Metamask in order to use this ATM.</p>;
     }
 
-    // Check to see if user is connected. If not, connect to their account
     if (!account) {
       return <button onClick={connectAccount}>Please connect your Metamask wallet</button>;
     }
 
-    if (balance == undefined) {
+    if (balance === undefined) {
       getBalance();
     }
 
@@ -104,7 +138,7 @@ export default function HomePage() {
           <h3>Transaction History</h3>
           <ul>
             {transactions.map((tx, index) => (
-              <li key={index}>{`${tx.timestamp} - ${tx.action}ed ${tx.amount} ETH`}</li>
+              <li key={index}>{`${tx.timestamp} - ${tx.action} ${tx.amount} ETH ${tx.recipient ? `to ${tx.recipient}` : ''}`}</li>
             ))}
           </ul>
         </div>
@@ -117,24 +151,70 @@ export default function HomePage() {
           <p>Connected Account Address: <strong>{account}</strong></p>
           <p className="balance">Connected Account Balance: {balance} ETH</p>
           <div className="button-group">
-            <button className="action-btn deposit-btn" onClick={() => setAction("deposit")}>Deposit</button><br></br>
-            <button className="action-btn withdraw-btn" onClick={() => setAction("withdraw")}>Withdraw</button><br></br>
+            <button className="action-btn deposit-btn" onClick={() => setAction("deposit")}>Deposit</button><br />
+            <button className="action-btn withdraw-btn" onClick={() => setAction("withdraw")}>Withdraw</button><br />
             <button className="action-btn transactions-btn" onClick={() => setShowTransactions(true)}>Transaction History</button>
+            <button className="action-btn pay-btn" onClick={() => setAction("pay")}>Pay to Address</button><br />
+            <button className="action-btn exchange-btn" onClick={() => setAction("exchange")}>Exchange Currency</button><br />
+            <button className="action-btn rent-btn" onClick={() => setAction("rent")}>Pay Rent</button><br />
           </div>
         </div>
       );
     }
 
-    if (!amount) {
+    if (action === "pay") {
       return (
         <div>
           <p>Connected Account Address: <strong>{account}</strong></p>
           <p className="balance">Connected Account Balance: {balance} ETH</p>
-          <p>{`How much would you like to ${action}?`}</p>
-          <div className="button-group">
-            <button className="amount-btn" onClick={() => { setAmount(1); performTransaction(action, 1); }}>1 ETH</button><br></br>
-            <button className="amount-btn" onClick={() => { setAmount(10); performTransaction(action, 10); }}>10 ETH</button>
-          </div>
+          <p>{`How much would you like to pay?`}</p>
+          <input
+            type="text"
+            placeholder="Amount in ETH"
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder="Recipient Address"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+          />
+          <button onClick={payToAddress}>Pay</button>
+          <button onClick={() => setAction(null)}>Cancel</button>
+        </div>
+      );
+    }
+
+    if (action === "exchange") {
+      return (
+        <div>
+          <p>Connected Account Address: <strong>{account}</strong></p>
+          <p className="balance">Connected Account Balance: {balance} ETH</p>
+          <p>{`How much USD would you like to exchange?`}</p>
+          <input
+            type="text"
+            placeholder="Amount in USD"
+            onChange={(e) => setExchangeAmount(e.target.value)}
+          />
+          <button onClick={exchangeCurrency}>Exchange</button>
+          <button onClick={() => setAction(null)}>Cancel</button>
+        </div>
+      );
+    }
+
+    if (action === "rent") {
+      return (
+        <div>
+          <p>Connected Account Address: <strong>{account}</strong></p>
+          <p className="balance">Connected Account Balance: {balance} ETH</p>
+          <p>{`How much rent would you like to pay?`}</p>
+          <input
+            type="text"
+            placeholder="Rent Amount in ETH"
+            onChange={(e) => setRentAmount(e.target.value)}
+          />
+          <button onClick={payRent}>Pay Rent</button>
+          <button onClick={() => setAction(null)}>Cancel</button>
         </div>
       );
     }
@@ -148,9 +228,9 @@ export default function HomePage() {
     <main className="container">
       <header><h1>Welcome to EBI (Ether Bank Of India)</h1></header>
       {initUser()}
+      {message && <p>{message}</p>}
       <style jsx>{`
-        .container
-         {
+        .container {
           text-align: center;
           background-color: #ffe4e1; /* Light Pink */
           min-height: 100vh;
@@ -163,79 +243,3 @@ export default function HomePage() {
         }
 
         .button-group
-        {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 20px;
-        }
-
-        button
-       {
-          background-color: green; /* Light Green */
-          border: none;
-          border-radius: 25px;
-          padding: 20px 40px;
-          font-size: 24px;
-          color: green;
-          cursor: pointer;
-          transition: background-color 0.3s ease, transform 0.3s ease;
-        }
-
-        button:hover {
-          background-color: green; /* Slightly darker green */
-          transform: translateY(-2px);
-        }
-
-        .back-btn {
-          background-color: #b0e0e6; /* Light Blue */
-        }
-          
-
-        .back-btn:hover {
-          background-color: #7ec0ee; /* Slightly darker light blue */
-        }
-
-        .action-btn {
-          width: 250px;
-        }
-
-        .amount-btn {
-          width: 200px;
-        }
-
-        ul {
-          list-style-type: none;
-          padding: 0;
-        }
-
-        ul li {
-          background-color: green; /* Light pinkish background */
-          margin: 5px;
-          padding: 10px;
-          border-radius: 10px;
-          font-family: 'Times New Roman', Times, serif;
-          font-size: 22px;
-        }
-
-        header h1 {
-          color: #a0522d; /* Light Brown */
-        }
-
-        p {
-          color: #a0522d; /* Light Brown */
-          font-size: 20px;
-          font-family: 'Times New Roman', Times, serif;
-        }
-
-        .balance {
-          font-family: 'Times New Roman', Times, serif;
-          font-size: 24px;
-          color: #228B22; /* Forest Green */
-        }
-      `}</style>
-    </main>
-  );
-}
